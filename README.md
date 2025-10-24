@@ -1,10 +1,11 @@
-# 🎰 The Claw Machine - RRM Rewards System
+# 🎰 The Claw Machine - Interactive Prize Selector
 
-A premium 3D carousel-based rewards system built with React, TypeScript, and WebGL. Perfect for e-commerce sites, gaming platforms, or any application needing an engaging random reward mechanic.
+A futuristic 3-row horizontal slider claw machine built with React, TypeScript, and GSAP. Features grid-locked positioning, weighted prize selection, and smooth claw animations.
 
 ![Status](https://img.shields.io/badge/status-production%20ready-brightgreen)
 ![React](https://img.shields.io/badge/react-18.2-blue)
 ![TypeScript](https://img.shields.io/badge/typescript-5.3-blue)
+![GSAP](https://img.shields.io/badge/gsap-3.12-green)
 
 ---
 
@@ -15,114 +16,106 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173/ and click **GO!** to test the rewards system.
+Open http://localhost:5173/ and click **GO!** to test the claw machine.
 
 ---
 
-## 📸 Demo
+## 🎮 How It Works
 
-- **Idle State**: Carousel slowly drifts left→right
-- **Spin Animation**: 3 full rotations + lands on winning prize
-- **Prize Reveal**: Modal shows reward with context-appropriate CTA
-- **Freeze/Unfreeze**: Carousel freezes during reveal, resumes after close
+### The Flow
+1. **Idle State**: 3 rows drift slowly left/right with alternating directions
+2. **Press GO**: All rows spin independently for 4 seconds
+3. **Grid Snap**: Rows freeze in perfect 3×5 grid alignment (15 total cards)
+4. **Prize Selection**: Weighted random selection from visible cards
+5. **Claw Animation**:
+   - Claw moves horizontally along rail to target column
+   - Descends vertically to winning card position
+   - Grabs card with closing animation
+6. **Prize Reveal**: Modal displays reward with context-appropriate CTA
+7. **Reset**: Claw returns to top-right position
+
+---
+
+## 🏗️ Architecture
+
+### Component Structure
+
+```
+ClawMachineV2 (Main Container)
+├── MultiRowSlider (3 Horizontal Rows)
+│   ├── Row 1: Independent scrolling
+│   ├── Row 2: Independent scrolling
+│   └── Row 3: Independent scrolling
+├── ClawAnimation (Overlay)
+│   ├── Horizontal Rail (top)
+│   ├── Claw Carriage (slides on rail)
+│   └── Claw (descends to grab)
+└── ResultModal (Prize Display)
+```
+
+### Key Features
+
+#### Grid System (3×5)
+- **Deterministic positioning**: Each card position has exact (x, y) coordinates
+- **Snap-to-grid**: After spin, rows align perfectly to show exactly 5 cards per row
+- **No off-screen winners**: All 15 positions are guaranteed visible
+- **Grid coordinates**: Used by claw for precise targeting
+
+```typescript
+interface GridPosition {
+  row: 0-2     // 3 rows
+  col: 0-4     // 5 columns
+  x: number    // Pixel X (center of card)
+  y: number    // Pixel Y (center of card)
+}
+```
+
+#### Claw Animation System
+- **Always visible** at top-right (minimal obstruction)
+- **Futuristic rail** with cyan pulsing lights
+- **2-move animation**:
+  1. Horizontal slide along rail to column
+  2. Vertical descent to row
+- **GSAP timeline** for smooth, controlled motion
+- **80×80px claw** comparable to card size
 
 ---
 
 ## 🎨 Customization Guide
 
-### 1. Add Your Own Prize Images
-
-**Location**: `src/features/claw/ClawMachineV2.tsx` (lines 42-58)
-
-**Current (placeholder images)**:
-```typescript
-function getHighDefImageUrl(prizeId: string, prizeName: string): string {
-  const seedMap: Record<string, string> = {
-    prize_001: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&h=600&fit=crop',
-    prize_002: 'https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=800&h=600&fit=crop',
-    // ... more prizes
-  };
-  return seedMap[prizeId] || `https://picsum.photos/seed/${prizeId}/800/600`;
-}
-```
-
-**Replace with your images**:
-```typescript
-function getHighDefImageUrl(prizeId: string, prizeName: string): string {
-  const seedMap: Record<string, string> = {
-    prize_001: '/assets/prizes/100-points.jpg',
-    prize_002: '/assets/prizes/10-percent-off.jpg',
-    prize_003: '/assets/prizes/5-dollar-off.jpg',
-    prize_004: '/assets/prizes/250-points.jpg',
-    prize_005: '/assets/prizes/drum-kit-808.jpg',
-    // ... add all your prizes
-  };
-  return seedMap[prizeId] || '/assets/prizes/default.jpg';
-}
-```
-
-**Image Requirements**:
-- **Dimensions**: 800×600px minimum (4:3 aspect ratio recommended)
-- **Format**: JPG, PNG, or WebP
-- **Size**: Keep under 500KB per image for fast loading
-- **CORS**: Ensure images are served from same domain or have CORS headers
-
----
-
-### 2. Customize Prize Names & Details
+### 1. Prize Configuration
 
 **Location**: `src/features/claw/prizes.fixture.json`
 
-**Current structure**:
 ```json
-[
-  {
-    "id": "prize_001",
-    "name": "100 Points",
-    "icon": "⭐",
-    "rarity": "common",
-    "weight": 250,
-    "rewardType": "loyalty_points",
-    "value": 100,
-    "msrpCents": 500,
-    "color": "#FFD700"
-  }
-]
+{
+  "id": "prize_001",
+  "name": "Glicktekk - Production Pack",
+  "imageFileName": "Glicktekk - Koktakt Bank + Oneshots.webp",
+  "rarity": "common",
+  "weight": 250,
+  "rewardType": "free_product",
+  "value": "glicktekk-pack",
+  "msrpCents": 2999,
+  "color": "#FFD700"
+}
 ```
 
 **Field Guide**:
 
-| Field | Type | Description | Example |
-|-------|------|-------------|---------|
-| `id` | string | Unique identifier (required) | `"prize_001"` |
-| `name` | string | Display name shown to user | `"100 Points"` |
-| `icon` | string | Emoji/icon (optional, for future use) | `"⭐"` |
-| `rarity` | enum | `common`, `rare`, `epic`, `legendary` | `"common"` |
-| `weight` | number | Drop chance weight (0-1000) | `250` |
-| `rewardType` | enum | See reward types below | `"loyalty_points"` |
-| `value` | number\|string | Reward value (varies by type) | `100` |
-| `productSlug` | string | For free products (optional) | `"drum-kit-808"` |
-| `msrpCents` | number | Display value in cents (optional) | `500` ($5.00) |
-| `color` | string | Hex color for glow effect (optional) | `"#FFD700"` |
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Unique identifier |
+| `name` | string | Display name |
+| `imageFileName` | string | Filename in `/public/prizes/` |
+| `rarity` | enum | `common`, `rare`, `epic`, `legendary` |
+| `weight` | number | Drop chance weight (0-1000) |
+| `rewardType` | enum | Reward type (see below) |
+| `value` | number\|string | Reward value |
+| `msrpCents` | number | Display value in cents |
+| `color` | string | Hex color for effects |
 
-**Example: Add a new prize**:
-```json
-{
-  "id": "prize_015",
-  "name": "Free Shipping",
-  "icon": "🚚",
-  "rarity": "common",
-  "weight": 200,
-  "rewardType": "discount_fixed",
-  "value": 0,
-  "msrpCents": 1500,
-  "color": "#4CAF50"
-}
-```
-
----
-
-### 3. Adjust Win Chances (Weights)
+### 2. Adjust Drop Rates
 
 **How weights work**:
 - Higher weight = higher chance to win
@@ -130,263 +123,174 @@ function getHighDefImageUrl(prizeId: string, prizeName: string): string {
 - Total of all weights = 100% probability pool
 
 **Example calculation**:
-```javascript
-prize_001: weight 250   → 250 / 1188 = 21.0% chance
-prize_002: weight 180   → 180 / 1188 = 15.2% chance
-prize_013: weight 10    → 10 / 1188  = 0.8% chance  (rare!)
+```
+prize_001: weight 250 → 250 / 1188 = 21.0% chance
+prize_002: weight 180 → 180 / 1188 = 15.2% chance
+prize_013: weight 10  → 10 / 1188  = 0.8% chance
 Total:     1188
 ```
 
-**Quick weight templates**:
+**Weight Templates**:
 
 | Drop Rate | Weight | Use Case |
 |-----------|--------|----------|
-| Very Common (25%) | 300 | Low-value rewards (10 points, 5% off) |
-| Common (15-20%) | 150-200 | Standard rewards (50 points, 10% off) |
-| Uncommon (10%) | 100 | Mid-tier rewards (100 points, free sample) |
-| Rare (5%) | 50 | High-value rewards (500 points, 30% off) |
-| Epic (2%) | 20 | Premium rewards (free product) |
-| Legendary (<1%) | 5-10 | Ultra-rare (VST voucher, $50 off) |
+| Very Common (25%) | 300 | Low-value rewards |
+| Common (15-20%) | 150-200 | Standard rewards |
+| Uncommon (10%) | 100 | Mid-tier rewards |
+| Rare (5%) | 50 | High-value rewards |
+| Epic (2%) | 20 | Premium rewards |
+| Legendary (<1%) | 5-10 | Ultra-rare rewards |
 
-**Example: Boost a prize's drop rate**:
+### 3. Prize Images
+
+**Location**: `/public/prizes/`
+
+**Requirements**:
+- **Format**: WebP, JPG, or PNG
+- **Dimensions**: 800×800px recommended (square)
+- **Size**: Keep under 500KB per image
+- **Naming**: Match `imageFileName` in prizes.fixture.json
+
+**Example**:
 ```json
 {
-  "id": "prize_001",
-  "name": "100 Points",
-  "weight": 250  // Change from 250 → 400 for higher chance
+  "imageFileName": "my-prize.webp"
 }
 ```
+Place file at: `/public/prizes/my-prize.webp`
 
-**Pro tip**: After changing weights, test with the "Skip" button (dev mode) to verify distribution feels right.
+### 4. Reward Types
 
----
-
-### 4. Reward Types & CTAs
-
-**Six reward types supported**:
-
-#### 1. `loyalty_points`
-Adds points to user's balance.
-
-```json
-{
-  "rewardType": "loyalty_points",
-  "value": 100  // Number of points
-}
-```
-- **CTA**: "Add Points"
-- **Action**: Increments `localStorage.pointsBalance`
-- **Backend**: Replace with `POST /api/loyalty/add`
-
-#### 2. `discount_percent`
-Percentage discount coupon.
-
-```json
-{
-  "rewardType": "discount_percent",
-  "value": 10  // 10% off
-}
-```
-- **CTA**: "Reveal Code"
-- **Action**: Generates code (e.g., `DRUM-ABC123`), copies to clipboard
-- **Backend**: Replace with `POST /api/promo/issue`
-
-#### 3. `discount_fixed`
-Fixed dollar amount discount.
-
-```json
-{
-  "rewardType": "discount_fixed",
-  "value": 5  // $5 off
-}
-```
-- **CTA**: "Reveal Code"
-- **Action**: Generates code, copies to clipboard
-- **Backend**: Replace with `POST /api/promo/issue`
-
-#### 4. `free_product`
-Grants a full product (sample pack, kit, etc.).
+#### `free_product`
+Full product (sample pack, kit, preset library)
 
 ```json
 {
   "rewardType": "free_product",
-  "value": "drum-kit-808",
-  "productSlug": "drum-kit-808"  // Required
+  "value": "product-slug",
+  "productSlug": "product-slug"
 }
 ```
 - **CTA**: "Add to Library"
-- **Action**: Adds to `localStorage.library`
-- **Backend**: Replace with `POST /api/library/grant`
+- **Action**: Adds to user's library
 
-#### 5. `free_oneshot`
-Grants a single sample/item.
-
-```json
-{
-  "rewardType": "free_oneshot",
-  "value": "snare-crisp-01",
-  "productSlug": "snare-crisp-01"  // Required
-}
-```
-- **CTA**: "Add to Library"
-- **Action**: Adds to `localStorage.library`
-- **Backend**: Replace with `POST /api/library/grant`
-
-#### 6. `vst_voucher`
-High-tier reward (plugin access, premium tier).
+#### `discount_percent`
+Percentage discount coupon
 
 ```json
 {
-  "rewardType": "vst_voucher",
-  "value": "vst-suite-pro"
+  "rewardType": "discount_percent",
+  "value": 10
 }
 ```
 - **CTA**: "Reveal Code"
 - **Action**: Generates code, copies to clipboard
-- **Backend**: Replace with `POST /api/voucher/issue`
 
-**Add your own reward type**:
-1. Add to `types.ts`: `export type RewardType = ... | 'your_new_type'`
-2. Update `ResultModal.tsx` CTA_MAP (line 31)
-3. Update `mockApi.ts` claim() logic (line 78)
+#### `discount_fixed`
+Fixed dollar discount
 
----
+```json
+{
+  "rewardType": "discount_fixed",
+  "value": 5
+}
+```
+- **CTA**: "Reveal Code"
+- **Action**: Generates code, copies to clipboard
+
+#### `loyalty_points`
+Points reward
+
+```json
+{
+  "rewardType": "loyalty_points",
+  "value": 100
+}
+```
+- **CTA**: "Add Points"
+- **Action**: Increments points balance
 
 ### 5. Visual Customization
 
-#### A. Carousel Curve
-**Location**: `src/features/claw/ClawMachineV2.tsx` (line 135)
+#### Spin Speed
+**Location**: `src/features/claw/ClawMachineV2.tsx:104`
 
 ```typescript
-<CircularGallery
-  bend={-1}  // ← Change this
-  // ...
-/>
+const spinDuration = 4000;  // Change milliseconds
 ```
+- `2000` → 2 seconds (fast)
+- `4000` → 4 seconds (current)
+- `6000` → 6 seconds (dramatic)
 
-- `bend={0}` → Flat carousel (no 3D curve)
-- `bend={-1}` → Subtle upward curve (current)
-- `bend={-3}` → Strong upward curve (dramatic)
-- `bend={1}` → Downward curve (inverted)
-- `bend={3}` → Strong downward curve
-
-#### B. Idle Scroll Speed
-**Location**: `src/components/CircularGallery.tsx` (line 298)
+#### Idle Drift Speed
+**Location**: `src/components/MultiRowSlider.tsx:52, 210`
 
 ```typescript
-autoScrollSpeed: number = 0.15;  // ← Change this
+velocity: 1  // Change speed (pixels per frame)
 ```
+- `0.5` → Very slow
+- `1` → Current (smooth)
+- `2` → Faster drift
 
-- `0.05` → Very slow drift (subtle)
-- `0.15` → Current (balanced)
-- `0.3` → Fast drift (energetic)
-- `0.5` → Very fast (might be too much)
-
-#### C. Spin Duration
-**Location**: `src/features/claw/ClawMachineV2.tsx` (line 85)
+#### Claw Animation Duration
+**Location**: `src/components/ClawAnimation.tsx:31`
 
 ```typescript
-const spinDuration = 3000;  // ← Change this (milliseconds)
+moveToPosition: async (gridPosition, duration = 2.5)
 ```
+- `1.5` → Fast claw
+- `2.5` → Current (balanced)
+- `4` → Slow, dramatic
 
-- `2000` → 2 seconds (fast, good for testing)
-- `3000` → 3 seconds (current, balanced)
-- `5000` → 5 seconds (dramatic, suspenseful)
+#### Colors & Styling
+**Location**: `src/components/ClawAnimation.css`
 
-#### D. Number of Laps
-**Location**: `src/features/claw/ClawMachineV2.tsx` (line 86)
-
-```typescript
-const numLaps = 3;  // ← Change this
-```
-
-- `1` → 1 full rotation (minimal)
-- `3` → 3 full rotations (current)
-- `5` → 5 full rotations (very dramatic)
-
-#### E. Colors & Styling
-**Location**: `src/features/claw/styles.module.css`
-
-**Change GO! button gradient**:
 ```css
-.buttonPlay {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  /* Change to your brand colors: */
-  /* background: linear-gradient(135deg, #FF6347 0%, #FF1493 100%); */
+/* Rail lights */
+.rail-light {
+  background: #0ff;  /* Change cyan color */
 }
-```
 
-**Change rarity colors**:
-```css
-:root {
-  --color-common: #e0e0e0;    /* Grey */
-  --color-rare: #ff6347;      /* Red */
-  --color-epic: #00ced1;      /* Cyan */
-  --color-legendary: #ffd700; /* Gold */
+/* Claw glow */
+.claw-glow {
+  stroke: #0ff;  /* Change accent color */
 }
 ```
 
 ---
 
-### 6. Backend Integration
+## 🔌 Backend Integration
 
-#### Replace Mock API with Real Endpoints
+### Replace Mock API
 
 **Location**: `src/features/claw/mockApi.ts`
 
 **Current (mock)**:
 ```typescript
 export async function play(): Promise<PlayResult> {
-  const latency = 400 + Math.random() * 300;
-  await new Promise((r) => setTimeout(r, latency));
+  await new Promise((r) => setTimeout(r, 500));
   const prize = selectPrizeByWeight();
-  return { playId: generatePlayId(), prize, serverLatencyMs: Math.round(latency) };
+  return { playId: generatePlayId(), prize, serverLatencyMs: 500 };
 }
 ```
 
-**Replace with**:
+**Replace with real API**:
 ```typescript
 export async function play(): Promise<PlayResult> {
   const response = await fetch('/api/claw/play', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    credentials: 'include', // For auth cookies
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to play');
-  }
-
-  return response.json();
-}
-```
-
-**Same for claim()**:
-```typescript
-export async function claim(playId: string, prize: Prize): Promise<ClaimResult> {
-  const response = await fetch('/api/claw/claim', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ playId, prizeId: prize.id }),
   });
 
-  if (!response.ok) {
-    throw new Error('Failed to claim');
-  }
-
+  if (!response.ok) throw new Error('Failed to play');
   return response.json();
 }
 ```
 
-#### Backend API Contracts
+### API Contracts
 
 **POST /api/claw/play**
-
-Request:
-```json
-{}  // Or include user auth token
-```
 
 Response:
 ```json
@@ -394,11 +298,10 @@ Response:
   "playId": "play_1729700000000_abc123",
   "prize": {
     "id": "prize_001",
-    "name": "100 Points",
-    "icon": "⭐",
+    "name": "Production Pack",
     "rarity": "common",
-    "rewardType": "loyalty_points",
-    "value": 100
+    "rewardType": "free_product",
+    "value": "product-slug"
   },
   "serverLatencyMs": 523
 }
@@ -420,256 +323,239 @@ Response:
   "playId": "play_1729700000000_abc123",
   "prizeId": "prize_001",
   "success": true,
-  "couponCode": "DRUM-ABC123",       // For discount_* types
-  "pointsAdded": 100,                // For loyalty_points
-  "grantedProductSlug": "drum-kit"   // For free_product types
+  "couponCode": "SAMPLE-ABC123",
+  "grantedProductSlug": "product-slug"
 }
 ```
 
 ---
 
-## 🛠️ Common Use Cases
+## 🎯 File Structure
 
-### Use Case 1: E-Commerce Store
-**Goal**: Reward customers with discounts and loyalty points.
-
-**Prizes to add**:
-```json
-[
-  { "name": "10% Off", "rewardType": "discount_percent", "value": 10, "weight": 200 },
-  { "name": "$5 Off", "rewardType": "discount_fixed", "value": 5, "weight": 180 },
-  { "name": "50 Points", "rewardType": "loyalty_points", "value": 50, "weight": 250 },
-  { "name": "Free Shipping", "rewardType": "discount_fixed", "value": 0, "weight": 150 }
-]
+```
+src/
+├── components/
+│   ├── MultiRowSlider.tsx      # 3-row slider component
+│   ├── MultiRowSlider.css      # Slider styling
+│   ├── ClawAnimation.tsx       # Claw + rail system
+│   └── ClawAnimation.css       # Claw styling
+├── features/claw/
+│   ├── ClawMachineV2.tsx       # Main container
+│   ├── ResultModal.tsx         # Prize display modal
+│   ├── mockApi.ts              # API integration layer
+│   ├── prizes.fixture.json     # Prize configuration
+│   ├── types.ts                # TypeScript interfaces
+│   └── styles.module.css       # Container styling
+public/prizes/                  # Prize images
 ```
 
-**Customization**:
-- Use product images for brand consistency
-- Integrate with Shopify/WooCommerce discount codes
-- Connect to loyalty program API
-
 ---
 
-### Use Case 2: Gaming Platform
-**Goal**: Reward players with in-game items and currency.
+## 🛠️ Development
 
-**Prizes to add**:
-```json
-[
-  { "name": "100 Coins", "rewardType": "loyalty_points", "value": 100, "weight": 300 },
-  { "name": "Rare Skin", "rewardType": "free_product", "value": "skin-dragon", "weight": 50 },
-  { "name": "Epic Weapon", "rewardType": "free_product", "value": "weapon-legendary", "weight": 20 }
-]
-```
+### Key Technologies
+- **React 18.2** - UI framework
+- **TypeScript 5.3** - Type safety
+- **GSAP 3.12** - Animation library
+- **Vite 5** - Build tool
 
-**Customization**:
-- Use game asset images (characters, items, currency icons)
-- Increase laps to 5-7 for more suspense
-- Add sound effects (see Advanced section)
+### Important Interfaces
 
----
+```typescript
+// Grid position for claw targeting
+interface GridPosition {
+  row: number;    // 0-2
+  col: number;    // 0-4
+  x: number;      // Pixel X coordinate
+  y: number;      // Pixel Y coordinate
+}
 
-### Use Case 3: SaaS Platform
-**Goal**: Reward users with trial upgrades and feature unlocks.
-
-**Prizes to add**:
-```json
-[
-  { "name": "7-Day Pro Trial", "rewardType": "vst_voucher", "value": "pro-trial-7d", "weight": 100 },
-  { "name": "50% Off Annual", "rewardType": "discount_percent", "value": 50, "weight": 30 },
-  { "name": "Free Month", "rewardType": "vst_voucher", "value": "free-month", "weight": 10 }
-]
-```
-
-**Customization**:
-- Use feature screenshots or icons as images
-- Connect to subscription management API
-- Add analytics tracking (see Advanced section)
-
----
-
-## 🎯 Quick Reference
-
-### File Locations Cheat Sheet
-
-| What to Change | File Location | Line(s) |
-|----------------|---------------|---------|
-| Prize images | `src/features/claw/ClawMachineV2.tsx` | 42-58 |
-| Prize names & weights | `src/features/claw/prizes.fixture.json` | All |
-| Carousel curve | `src/features/claw/ClawMachineV2.tsx` | 135 |
-| Idle scroll speed | `src/components/CircularGallery.tsx` | 298 |
-| Spin duration | `src/features/claw/ClawMachineV2.tsx` | 85 |
-| Number of laps | `src/features/claw/ClawMachineV2.tsx` | 86 |
-| Button colors | `src/features/claw/styles.module.css` | 148-152 |
-| Mock API → Real API | `src/features/claw/mockApi.ts` | 54, 82 |
-
----
-
-## 🧪 Testing Your Changes
-
-### 1. Test Prize Distribution
-```bash
-# In browser console (F12):
-for (let i = 0; i < 100; i++) {
-  // Click GO! 100 times and note which prizes appear most
+// Visible card with grid data
+interface VisibleCard {
+  rowIndex: number;
+  colIndex: number;
+  cardIndex: number;
+  prizeId: string;
+  gridPosition: GridPosition;  // For claw animation
 }
 ```
 
-### 2. Verify Weights
-```javascript
-// In mockApi.ts, add this temporarily:
-console.log('Prize:', prize.name, 'Weight:', prize.weight);
-```
+### Build Commands
 
-### 3. Test All Reward Types
-Create a test prize for each type with `weight: 1000` (guaranteed win) and verify:
-- ✅ CTA button shows correct text
-- ✅ Claim action works (check localStorage or backend)
-- ✅ Success message appears
-
----
-
-## 📦 Deployment
-
-### Build for Production
 ```bash
-npm run build
-```
-
-Outputs to `dist/` folder. Deploy to:
-- **Vercel**: `vercel deploy`
-- **Netlify**: Drag `dist/` to netlify.com
-- **AWS S3**: `aws s3 sync dist/ s3://your-bucket`
-
-### Environment Variables
-Create `.env` file:
-```bash
-VITE_API_URL=https://api.yoursite.com
-VITE_CDN_URL=https://cdn.yoursite.com
-```
-
-Use in code:
-```typescript
-const apiUrl = import.meta.env.VITE_API_URL;
-```
-
----
-
-## 🔧 Advanced Customization
-
-### Add Sound Effects
-```typescript
-// In ClawMachineV2.tsx, after spin completes:
-const winSound = new Audio('/assets/sounds/win.mp3');
-winSound.play();
-```
-
-### Add Analytics Tracking
-```typescript
-// In handleGO():
-analytics.track('claw_play_started', {
-  timestamp: Date.now(),
-  userId: currentUser.id,
-});
-
-// In handleClaim():
-analytics.track('claw_prize_claimed', {
-  prizeId: result.prizeId,
-  rewardType: prize.rewardType,
-  value: prize.value,
-});
-```
-
-### Add Rate Limiting
-```typescript
-// In ClawMachineV2.tsx:
-const [playsRemaining, setPlaysRemaining] = useState(3);
-
-const handleGO = useCallback(async () => {
-  if (playsRemaining <= 0) {
-    setError('No plays remaining. Come back tomorrow!');
-    return;
-  }
-  // ... rest of logic
-  setPlaysRemaining(prev => prev - 1);
-}, [playsRemaining]);
-```
-
-### Add Pity Timer
-```typescript
-// In mockApi.ts:
-let spinsSinceRare = 0;
-
-export async function play(): Promise<PlayResult> {
-  spinsSinceRare++;
-
-  // Guarantee rare after 20 spins
-  if (spinsSinceRare >= 20) {
-    const rarePrizes = prizes.filter(p => p.rarity === 'rare' || p.rarity === 'epic');
-    const prize = rarePrizes[Math.floor(Math.random() * rarePrizes.length)];
-    spinsSinceRare = 0;
-    return { playId: generatePlayId(), prize, serverLatencyMs: 500 };
-  }
-
-  // Normal weighted selection
-  const prize = selectPrizeByWeight();
-  if (prize.rarity === 'rare' || prize.rarity === 'epic') spinsSinceRare = 0;
-  return { playId: generatePlayId(), prize, serverLatencyMs: 500 };
-}
+npm run dev      # Development server
+npm run build    # Production build
+npm run preview  # Preview production build
 ```
 
 ---
 
 ## 🐛 Troubleshooting
 
-### Problem: Images not loading
-**Solution**: Check CORS headers. If using external CDN:
+### Images not loading
+**Issue**: Prize images show as broken
+**Solution**:
+1. Check images are in `/public/prizes/`
+2. Verify `imageFileName` matches exactly (case-sensitive)
+3. Ensure images are < 500KB
+
+### Claw position is off
+**Issue**: Claw doesn't align with winning card
+**Solution**:
+1. Check `containerWidth` matches actual container
+2. Verify grid snap is working (check console logs)
+3. Ensure card size calculation is correct
+
+### Animation is janky
+**Issue**: Slider or claw animation stutters
+**Solution**:
+1. Check velocity is set to `1` (not too high)
+2. Ensure GPU acceleration CSS is present
+3. Verify GSAP is properly imported
+
+### Grid not aligned
+**Issue**: Cards don't snap to perfect grid
+**Solution**:
+1. Check `snapPositionsToGrid()` is called after spin
+2. Verify `targetVisibleCards = 5` in code
+3. Ensure container width is stable (not changing)
+
+---
+
+## 📚 Advanced Customization
+
+### Add Sound Effects
+
 ```typescript
-// Add crossOrigin attribute:
-<img src={imageUrl} crossOrigin="anonymous" />
+// In ClawMachineV2.tsx
+const spinSound = new Audio('/sounds/spin.mp3');
+const winSound = new Audio('/sounds/win.mp3');
+
+// Play on spin
+spinSound.play();
+
+// Play when claw grabs
+winSound.play();
 ```
 
-### Problem: Carousel doesn't freeze after win
-**Solution**: Check browser console for errors. Ensure `useMemo` is wrapping `carouselItems`.
+### Add Analytics
 
-### Problem: Weights don't seem right
-**Solution**: Test with higher weights (e.g., set one prize to 1000, others to 1) to verify logic works.
+```typescript
+// Track spin start
+analytics.track('claw_spin', {
+  timestamp: Date.now(),
+  userId: user.id,
+});
 
-### Problem: Modal doesn't close
-**Solution**: Check if `handleCloseModal` is called. Add `console.log('Closing modal')` to debug.
+// Track prize won
+analytics.track('claw_prize', {
+  prizeId: prize.id,
+  rarity: prize.rarity,
+  value: prize.value,
+});
+```
+
+### Rate Limiting
+
+```typescript
+const [playsRemaining, setPlaysRemaining] = useState(3);
+
+const handleGO = async () => {
+  if (playsRemaining <= 0) {
+    setError('Come back tomorrow for more plays!');
+    return;
+  }
+  // ... spin logic
+  setPlaysRemaining(prev => prev - 1);
+};
+```
 
 ---
 
-## 📚 Additional Resources
+## 📦 Deployment
 
-- **Full API Docs**: See `src/features/claw/types.ts` for all TypeScript interfaces
-- **Design Decisions**: See `REDESIGN_V2.md` for architecture details
-- **Original Context**: See `context.md` for V1 implementation notes
+### Build for Production
+
+```bash
+npm run build
+```
+
+Outputs to `dist/` folder.
+
+### Deploy Options
+
+**Vercel**:
+```bash
+npm i -g vercel
+vercel deploy
+```
+
+**Netlify**:
+```bash
+npm run build
+# Drag dist/ folder to netlify.com
+```
+
+**AWS S3**:
+```bash
+aws s3 sync dist/ s3://your-bucket --acl public-read
+```
 
 ---
 
-## 💡 Tips & Best Practices
+## 💡 Best Practices
 
-1. **Start with mock data** - Test visuals before connecting real backend
-2. **Use realistic weights** - Don't make legendary prizes too rare (< 0.5% feels unfair)
-3. **Test on mobile** - Carousel should work on all screen sizes
-4. **Add loading states** - Show spinner during `mockApi.play()` call
-5. **Graceful errors** - Handle network failures with friendly messages
-6. **A/B test weights** - Track which prizes keep users engaged
-7. **Seasonal prizes** - Update `prizes.fixture.json` for holidays/events
+1. **Test weights thoroughly** - Use console to verify distribution
+2. **Optimize images** - WebP format, < 500KB per image
+3. **Mobile first** - Test on various screen sizes
+4. **Graceful errors** - Handle network failures with friendly messages
+5. **Analytics tracking** - Monitor what prizes users win
+6. **A/B test** - Experiment with weights to maximize engagement
+7. **Seasonal updates** - Swap prizes for holidays/events
 
 ---
 
-## 🤝 Support
+## 📄 Project Context
 
-Questions? Issues? Open a GitHub issue or contact the dev team.
+### What Changed from V1
+- ❌ Removed 3D carousel (OGL/WebGL complexity)
+- ✅ Implemented 3-row horizontal slider
+- ✅ Added claw animation system
+- ✅ Introduced grid-based positioning
+- ✅ GSAP for smoother animations
+- ✅ TypeScript throughout
 
-**Version**: 2.0
-**Last Updated**: 2025-10-23
-**Status**: Production Ready ✅
+### Design Decisions
+- **3 rows instead of carousel**: Better performance, clearer UX
+- **Grid system**: Enables precise claw targeting
+- **Alternating directions**: More dynamic visual interest
+- **Rail-based claw**: Mimics real claw machine mechanics
+
+---
+
+## 🤝 Contributing
+
+Have improvements? Open a PR or issue on GitHub!
+
+---
+
+## 📝 Version History
+
+**v2.0** (2024-10-24)
+- Complete rewrite with 3-row slider
+- Added claw animation system
+- Grid-based positioning
+- GSAP integration
+
+**v1.0** (2024-10-23)
+- Initial 3D carousel implementation
 
 ---
 
 ## 📄 License
 
 MIT License - Use in commercial projects freely.
+
+---
+
+**Questions?** Open a GitHub issue or check the troubleshooting section above.
