@@ -1,0 +1,37 @@
+.circular-gallery-rrm {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  cursor: default;
+  pointer-events: none; /* Disable all user interaction */
+}
+
+.circular-gallery-rrm canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* Disable canvas interaction */
+}
+
+/* Sleek center indicator line */
+.circular-gallery-rrm::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 2px;
+  height: 80%;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.3) 20%,
+    rgba(255, 255, 255, 0.6) 50%,
+    rgba(255, 255, 255, 0.3) 80%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+  pointer-events: none;
+  z-index: 10;
+}

@@ -1,0 +1,193 @@
+.claw-system {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 100;
+}
+
+/* Horizontal Rail System */
+.claw-rail {
+  position: absolute;
+  left: 0;
+  height: 40px;
+  display: flex;
+  align-items: center;
+}
+
+.rail-track {
+  position: absolute;
+  width: 100%;
+  height: 8px;
+  background: linear-gradient(to bottom, #333, #555, #333);
+  border-radius: 4px;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.rail-track::before,
+.rail-track::after {
+  content: '';
+  position: absolute;
+  height: 100%;
+  width: 20px;
+  background: linear-gradient(to right, #666, #888);
+  border-radius: 4px;
+}
+
+.rail-track::before {
+  left: 0;
+}
+
+.rail-track::after {
+  right: 0;
+}
+
+/* Futuristic Rail Lights */
+.rail-lights {
+  position: absolute;
+  width: 100%;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  height: 100%;
+}
+
+.rail-light {
+  width: 6px;
+  height: 6px;
+  background: #0ff;
+  border-radius: 50%;
+  box-shadow:
+    0 0 4px #0ff,
+    0 0 8px rgba(0, 255, 255, 0.5);
+  animation: rail-light-pulse 2s ease-in-out infinite;
+}
+
+.rail-light:nth-child(odd) {
+  animation-delay: 0.5s;
+}
+
+@keyframes rail-light-pulse {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+/* Claw Carriage (moves on rail) */
+.claw-carriage {
+  position: absolute;
+  width: 80px;
+  height: 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform-origin: top center;
+  will-change: transform;
+}
+
+/* Vertical Cable */
+.claw-cable {
+  width: 3px;
+  height: 40px;
+  background: linear-gradient(to bottom, #666, #888);
+  box-shadow:
+    0 0 4px rgba(0, 0, 0, 0.5),
+    inset 1px 0 0 rgba(255, 255, 255, 0.2);
+  position: relative;
+}
+
+.claw-cable::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 12px;
+  height: 12px;
+  background: #555;
+  border-radius: 50%;
+  border: 2px solid #888;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* Claw Container */
+.claw {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  transform-origin: top center;
+  will-change: transform;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5));
+}
+
+/* Claw SVG Styling */
+.claw-svg {
+  display: block;
+  transform-origin: center top;
+}
+
+/* Claw Glow Animation */
+.claw-glow {
+  animation: claw-glow-pulse 2s ease-in-out infinite;
+}
+
+@keyframes claw-glow-pulse {
+  0%, 100% {
+    opacity: 0.2;
+    stroke-width: 1;
+  }
+  50% {
+    opacity: 0.5;
+    stroke-width: 2;
+  }
+}
+
+/* Claw Arms Animation (when grabbing) */
+.claw-arm-left,
+.claw-arm-right {
+  transform-origin: center top;
+  transition: transform 0.3s ease;
+}
+
+.claw.grabbing .claw-arm-left {
+  transform: rotate(-5deg);
+}
+
+.claw.grabbing .claw-arm-right {
+  transform: rotate(5deg);
+}
+
+/* Shadow under claw for depth */
+.claw::after {
+  content: '';
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 20px;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.4) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: shadow-pulse 2s ease-in-out infinite;
+}
+
+@keyframes shadow-pulse {
+  0%, 100% {
+    opacity: 0.3;
+    transform: translateX(-50%) scale(0.8);
+  }
+  50% {
+    opacity: 0.6;
+    transform: translateX(-50%) scale(1.1);
+  }
+}

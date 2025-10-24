@@ -1,0 +1,80 @@
+[
+  {
+    "id": "prize_001",
+    "name": "Glicktekk - Koktakt Bank + Oneshots",
+    "icon": "🥁",
+    "rarity": "common",
+    "weight": 200,
+    "rewardType": "free_product",
+    "value": "glicktekk-koktakt-bank-oneshots",
+    "productSlug": "glicktekk-koktakt-bank-oneshots",
+    "msrpCents": 2999,
+    "color": "#FF6347",
+    "imageFileName": "Glicktekk - Koktakt Bank + Oneshots.webp"
+  },
+  {
+    "id": "prize_002",
+    "name": "Fusion - Sample Library",
+    "icon": "⚡",
+    "rarity": "common",
+    "weight": 200,
+    "rewardType": "free_product",
+    "value": "fusion-sample-library",
+    "productSlug": "fusion-sample-library",
+    "msrpCents": 3499,
+    "color": "#FFD700",
+    "imageFileName": "Fusion- Sample Library.webp"
+  },
+  {
+    "id": "prize_003",
+    "name": "Mirage - Production Suite",
+    "icon": "🎹",
+    "rarity": "rare",
+    "weight": 150,
+    "rewardType": "free_product",
+    "value": "mirage-production-suite",
+    "productSlug": "mirage-production-suite",
+    "msrpCents": 4999,
+    "color": "#00CED1",
+    "imageFileName": "Mirage - Production Suite.webp"
+  },
+  {
+    "id": "prize_004",
+    "name": "Retrosphere - Omnisphere Library",
+    "icon": "🎤",
+    "rarity": "rare",
+    "weight": 120,
+    "rewardType": "free_product",
+    "value": "retrosphere-omnisphere-library",
+    "productSlug": "retrosphere-omnisphere-library",
+    "msrpCents": 5999,
+    "color": "#FF1493",
+    "imageFileName": "Retrosphere-OmnisphereLibrary.webp"
+  },
+  {
+    "id": "prize_005",
+    "name": "Martin Leib - Toolkit 24.5",
+    "icon": "🌊",
+    "rarity": "epic",
+    "weight": 80,
+    "rewardType": "free_product",
+    "value": "martin-leib-toolkit-24-5",
+    "productSlug": "martin-leib-toolkit-24-5",
+    "msrpCents": 7999,
+    "color": "#9932CC",
+    "imageFileName": "MartinLeib-Toolkit24.5.webp"
+  },
+  {
+    "id": "prize_006",
+    "name": "ALECTO - San Roque Reggaeton Production Suite 2.22",
+    "icon": "👑",
+    "rarity": "legendary",
+    "weight": 50,
+    "rewardType": "free_product",
+    "value": "alecto-san-roque-reggaeton-production-suite",
+    "productSlug": "alecto-san-roque-reggaeton-production-suite",
+    "msrpCents": 9999,
+    "color": "#FFD700",
+    "imageFileName": "ALECTO-SanRoqueReggaetonProductionSuite2.22.jpg"
+  }
+]

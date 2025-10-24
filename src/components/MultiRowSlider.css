@@ -1,0 +1,84 @@
+.multi-row-slider {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: linear-gradient(to bottom, #2a2a2a 0%, #1a1a1a 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  padding: 20px 0;
+}
+
+.slider-row {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+
+.slider-row-track {
+  display: flex;
+  position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform;
+}
+
+.slider-card {
+  flex-shrink: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #1a1a1a;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  position: relative;
+  border: 3px solid transparent;
+}
+
+.slider-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  background: #2a2a2a;
+  display: block;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* Golden highlight for winning card */
+.slider-card.highlighted {
+  border-color: #ffd700;
+  box-shadow:
+    0 0 20px rgba(255, 215, 0, 0.6),
+    0 0 40px rgba(255, 215, 0, 0.4),
+    0 4px 12px rgba(0, 0, 0, 0.5);
+  transform: scale(1.05);
+  z-index: 10;
+}
+
+/* Shine effect on highlighted card */
+.slider-card.highlighted::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent 30%,
+    rgba(255, 215, 0, 0.3) 50%,
+    transparent 70%
+  );
+  animation: shine 2s infinite;
+}
+
+@keyframes shine {
+  0% {
+    transform: translateX(-100%) translateY(-100%) rotate(45deg);
+  }
+  100% {
+    transform: translateX(100%) translateY(100%) rotate(45deg);
+  }
+}
