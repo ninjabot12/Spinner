@@ -8,11 +8,11 @@
   z-index: 100;
 }
 
-/* Horizontal Rail System */
+/* Horizontal Rail System - Made thicker and more prominent */
 .claw-rail {
   position: absolute;
   left: 0;
-  height: 40px;
+  height: 50px; /* Increased from 40px */
   display: flex;
   align-items: center;
 }
@@ -20,14 +20,17 @@
 .rail-track {
   position: absolute;
   width: 100%;
-  height: 8px;
-  background: linear-gradient(to bottom, #333, #555, #333);
-  border-radius: 4px;
+  height: 16px; /* Doubled from 8px for better visibility */
+  background: linear-gradient(to bottom, #444, #666, #444);
+  border-radius: 8px;
+  border: 2px solid #333; /* Added border for definition */
   box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    0 4px 12px rgba(0, 0, 0, 0.7),
+    inset 0 2px 1px rgba(255, 255, 255, 0.2),
+    inset 0 -2px 1px rgba(0, 0, 0, 0.3);
 }
 
+/* Rail end caps - just decorative ends, no vertical bars */
 .rail-track::before,
 .rail-track::after {
   content: '';
@@ -82,11 +85,11 @@
   }
 }
 
-/* Claw Carriage (moves on rail) */
+/* Claw Carriage (moves on rail) - Enhanced connection */
 .claw-carriage {
   position: absolute;
-  width: 80px;
-  height: 60px;
+  width: 100px; /* Increased to match larger claw */
+  height: 70px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -94,28 +97,78 @@
   will-change: transform;
 }
 
-/* Vertical Cable */
-.claw-cable {
-  width: 3px;
-  height: 40px;
-  background: linear-gradient(to bottom, #666, #888);
+/* Rail-to-Carriage Connector - Attaches directly to rail */
+.claw-carriage::before {
+  content: '';
+  position: absolute;
+  top: -8px; /* Overlap with rail for proper attachment */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 16px;
+  background: linear-gradient(to bottom, #666, #555);
+  border-radius: 4px;
+  border: 2px solid #444;
   box-shadow:
-    0 0 4px rgba(0, 0, 0, 0.5),
-    inset 1px 0 0 rgba(255, 255, 255, 0.2);
-  position: relative;
+    0 2px 6px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  z-index: 1;
 }
 
+/* Dynamic Rope/Cable System - Extends with claw */
+.claw-cable {
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  min-height: 20px;
+  background: repeating-linear-gradient(
+    to bottom,
+    #666 0px,
+    #888 2px,
+    #666 4px,
+    #555 6px,
+    #666 8px
+  );
+  box-shadow:
+    0 0 6px rgba(0, 0, 0, 0.6),
+    inset 1px 0 1px rgba(255, 255, 255, 0.2),
+    inset -1px 0 1px rgba(0, 0, 0, 0.3);
+  transform-origin: top center;
+  transition: height 0.3s ease-out;
+  z-index: -1; /* Behind the claw */
+}
+
+/* Cable attachment point to rail mechanism */
 .claw-cable::before {
   content: '';
   position: absolute;
-  top: 0;
+  top: -12px;
   left: 50%;
   transform: translateX(-50%);
-  width: 12px;
+  width: 24px;
+  height: 20px;
+  background: linear-gradient(to bottom, #777, #555);
+  border-radius: 4px 4px 8px 8px;
+  border: 2px solid #444;
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Cable bottom attachment to claw */
+.claw-cable::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px;
   height: 12px;
-  background: #555;
+  background: linear-gradient(to bottom, #666, #444);
   border-radius: 50%;
-  border: 2px solid #888;
+  border: 1px solid #333;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 

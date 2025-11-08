@@ -6,13 +6,19 @@
  * - Grid-locked movement for precise positioning
  */
 
-import React, { useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
+import React, { useRef, forwardRef, useImperativeHandle } from 'react';
 import gsap from 'gsap';
 import { GridPosition } from './MultiRowSlider';
 import './ClawAnimation.css';
 
 export interface ClawAnimationHandle {
   moveToPosition(gridPosition: GridPosition, duration?: number): Promise<void>;
+  pickupAndDeliver(
+    cardPosition: GridPosition,
+    displaySlotPosition: { x: number; y: number },
+    phantomCardRef: React.RefObject<HTMLDivElement>,
+    cardSize: number
+  ): Promise<void>;
   reset(): void;
 }
 
@@ -27,14 +33,15 @@ const ClawAnimation = forwardRef<ClawAnimationHandle, ClawAnimationProps>(
     const railRef = useRef<HTMLDivElement>(null);
     const clawCarriageRef = useRef<HTMLDivElement>(null);
     const clawRef = useRef<HTMLDivElement>(null);
+    const cableRef = useRef<HTMLDivElement>(null);
 
-    // Initial position: top-right, between rows
-    const initialX = containerWidth - 100; // 100px from right edge
+    // Initial position: top-right, visible within container bounds
+    const initialX = containerWidth - 200; // 200px from right edge to ensure visibility
     const railY = railTop + 20; // Rail height from top
 
     useImperativeHandle(ref, () => ({
       moveToPosition: async (gridPosition: GridPosition, duration = 2) => {
-        if (!clawCarriageRef.current || !clawRef.current) return;
+        if (!clawCarriageRef.current || !clawRef.current || !cableRef.current) return;
 
         const timeline = gsap.timeline();
 
@@ -46,11 +53,19 @@ const ClawAnimation = forwardRef<ClawAnimationHandle, ClawAnimationProps>(
         });
 
         // Move 2: Vertical descent to target row
-        timeline.to(clawRef.current, {
-          y: gridPosition.y - railY,
-          duration: duration * 0.4,
-          ease: 'power2.inOut',
-        });
+        const dropDistance = gridPosition.y - railY;
+        timeline
+          .to(clawRef.current, {
+            y: dropDistance,
+            duration: duration * 0.4,
+            ease: 'power2.inOut',
+          })
+          // Extend cable as claw descends
+          .to(cableRef.current, {
+            height: Math.max(20, dropDistance + 40), // Ensure minimum height
+            duration: duration * 0.4,
+            ease: 'power2.inOut',
+          }, '<'); // Start at same time as claw descent
 
         // Grab animation (claw closes slightly)
         timeline.to(clawRef.current, {
@@ -64,8 +79,184 @@ const ClawAnimation = forwardRef<ClawAnimationHandle, ClawAnimationProps>(
         await timeline.then();
       },
 
+      pickupAndDeliver: async (
+        cardPosition: GridPosition,
+        displaySlotPosition: { x: number; y: number },
+        phantomCardRef: React.RefObject<HTMLDivElement>,
+        cardSize: number
+      ) => {
+        if (!clawCarriageRef.current || !clawRef.current || !phantomCardRef.current || !cableRef.current) return;
+
+        const timeline = gsap.timeline();
+        const phantomCard = phantomCardRef.current;
+        const dropDistance = cardPosition.y - railY;
+
+        // Phase 1: Move to card position (existing moveToPosition logic)
+        timeline
+          // Horizontal sweep to column - center perfectly on card
+          .to(clawCarriageRef.current, {
+            x: cardPosition.x, // Center on card position exactly
+            duration: 1.2,
+            ease: 'power2.inOut',
+          })
+          // Vertical descent to row with cable extension
+          .to(clawRef.current, {
+            y: dropDistance,
+            duration: 0.8,
+            ease: 'power2.inOut',
+          })
+          .to(cableRef.current, {
+            height: Math.max(20, dropDistance + 40),
+            duration: 0.8,
+            ease: 'power2.inOut',
+          }, '<')
+          // Phase 2: Reveal phantom card BEFORE grab (so card appears before it's grabbed)
+          .set(phantomCard, {
+            visibility: 'visible',
+            left: cardPosition.x - cardSize / 2, // Center phantom card at exact position
+            top: cardPosition.y - cardSize / 2,
+          })
+          // Wait a moment for card to be visible
+          .to({}, { duration: 0.2 })
+          // Grab: claw closes slightly
+          .to(clawRef.current, {
+            scale: 0.95,
+            duration: 0.15,
+            ease: 'power2.in',
+          })
+          // Phase 3: Lift card (2D depth simulation) - scale during lift
+          .to(
+            phantomCard,
+            {
+              scale: 1.15, // Slightly bigger (closer to camera)
+              boxShadow: '0 30px 60px rgba(0, 0, 0, 0.7), 0 0 40px rgba(255, 215, 0, 0.8)',
+              duration: 0.6,
+              ease: 'power2.out',
+            }
+          )
+          // Calculate safe lift height - never go above rail (y=0)
+          .to(
+            clawRef.current,
+            {
+              y: Math.max(0, dropDistance - 150), // Lift up but never above rail level
+              duration: 0.6,
+              ease: 'power2.out',
+            },
+            '<' // Start at same time as scale
+          )
+          // Move phantom card with claw, ensuring it stays visible below rail
+          .to(
+            phantomCard,
+            {
+              top: Math.max(railY + 60, cardPosition.y - 150) - cardSize / 2, // Keep card below rail
+              duration: 0.6,
+              ease: 'power2.out',
+            },
+            '<'
+          )
+          // Retract cable to match new claw position
+          .to(
+            cableRef.current,
+            {
+              height: Math.max(20, Math.max(0, dropDistance - 150) + 40),
+              duration: 0.6,
+              ease: 'power2.out',
+            },
+            '<'
+          )
+          // Phase 4: Horizontal carry to display slot - move BOTH claw carriage and phantom card
+          .to(
+            clawCarriageRef.current,
+            {
+              x: displaySlotPosition.x,
+              duration: 1.5,
+              ease: 'power1.inOut',
+            }
+          )
+          .to(
+            phantomCard,
+            {
+              left: displaySlotPosition.x - cardSize / 2, // Move with claw horizontally
+              // Keep vertical position consistent during horizontal move
+              top: Math.max(railY + 60, cardPosition.y - 150) - cardSize / 2,
+              duration: 1.5,
+              ease: 'power1.inOut',
+            },
+            '<' // Start at same time as claw carriage
+          )
+          // Phase 5: Small descent for release (just a slight dip, not to display slot)
+          .to(clawRef.current, {
+            y: `+=30`, // Just move down 30px for release animation
+            duration: 0.4,
+            ease: 'power2.in',
+          })
+          // Extend cable slightly for the small descent
+          .to(
+            cableRef.current,
+            {
+              height: Math.max(20, Math.max(0, dropDistance - 150) + 40 + 30), // Add 30px to cable
+              duration: 0.4,
+              ease: 'power2.in',
+            },
+            '<'
+          )
+          // Move phantom card down slightly with claw
+          .to(
+            phantomCard,
+            {
+              top: `+=30`, // Move card down same amount
+              scale: 1, // Back to normal size
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+              duration: 0.4,
+              ease: 'power2.in',
+            },
+            '<'
+          )
+          // Phase 6: Release - claw opens
+          .to(clawRef.current, {
+            scale: 1,
+            duration: 0.15,
+            ease: 'power2.out',
+          })
+          // Hide phantom card (will be replaced by display slot's bouncy animation)
+          .set(phantomCard, {
+            visibility: 'hidden',
+          })
+          // Phase 7: Claw returns home
+          .to(
+            clawRef.current,
+            {
+              y: 0,
+              duration: 0.6,
+              ease: 'power2.inOut',
+            },
+            '+=0.2' // Small delay after release
+          )
+          // Retract cable as claw returns
+          .to(
+            cableRef.current,
+            {
+              height: 20, // Back to initial height
+              duration: 0.6,
+              ease: 'power2.inOut',
+            },
+            '<'
+          )
+          .to(
+            clawCarriageRef.current,
+            {
+              x: initialX,
+              duration: 1,
+              ease: 'power2.inOut',
+            },
+            '<'
+          );
+
+        await timeline.then();
+      },
+
       reset: () => {
-        if (!clawCarriageRef.current || !clawRef.current) return;
+        if (!clawCarriageRef.current || !clawRef.current || !cableRef.current) return;
         gsap.to(clawCarriageRef.current, {
           x: initialX,
           duration: 0.8,
@@ -74,6 +265,11 @@ const ClawAnimation = forwardRef<ClawAnimationHandle, ClawAnimationProps>(
         gsap.to(clawRef.current, {
           y: 0,
           scale: 1,
+          duration: 0.8,
+          ease: 'power2.inOut',
+        });
+        gsap.to(cableRef.current, {
+          height: 20,
           duration: 0.8,
           ease: 'power2.inOut',
         });
@@ -88,7 +284,8 @@ const ClawAnimation = forwardRef<ClawAnimationHandle, ClawAnimationProps>(
           className="claw-rail"
           style={{
             top: `${railY}px`,
-            width: `${containerWidth}px`,
+            width: `${containerWidth + 40}px`, // Extend 20px on each side
+            left: '-20px', // Offset to extend outside left boundary
           }}
         >
           {/* Rail visual (futuristic tech style) */}
@@ -105,70 +302,45 @@ const ClawAnimation = forwardRef<ClawAnimationHandle, ClawAnimationProps>(
           ref={clawCarriageRef}
           className="claw-carriage"
           style={{
-            top: `${railY}px`,
+            top: `${railY + 18}px`, // Moved down 10 more pixels for proper rail attachment
             left: '0px',
             transform: `translateX(${initialX}px)`,
           }}
         >
-          {/* Vertical cable */}
-          <div className="claw-cable" />
+          {/* Dynamic vertical cable that extends/retracts */}
+          <div
+            ref={cableRef}
+            className="claw-cable"
+            style={{
+              height: '20px', // Initial height, will be animated
+            }}
+          />
 
-          {/* Claw (moves vertically) */}
-          <div ref={clawRef} className="claw">
-            {/* Claw SVG */}
-            <svg
-              width="80"
-              height="80"
-              viewBox="0 0 80 80"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              className="claw-svg"
-            >
-              {/* Claw body */}
-              <g className="claw-body">
-                {/* Central mechanism */}
-                <circle cx="40" cy="15" r="12" fill="#555" stroke="#888" strokeWidth="2" />
-                <circle cx="40" cy="15" r="6" fill="#666" />
-
-                {/* Left claw arm */}
-                <path
-                  d="M 35 20 Q 25 35 20 50 L 25 55 Q 30 40 35 25 Z"
-                  fill="#777"
-                  stroke="#999"
-                  strokeWidth="2"
-                  className="claw-arm-left"
-                />
-
-                {/* Right claw arm */}
-                <path
-                  d="M 45 20 Q 55 35 60 50 L 55 55 Q 50 40 45 25 Z"
-                  fill="#777"
-                  stroke="#999"
-                  strokeWidth="2"
-                  className="claw-arm-right"
-                />
-
-                {/* Center claw arm */}
-                <path
-                  d="M 38 22 L 38 50 L 42 50 L 42 22 Z"
-                  fill="#888"
-                  stroke="#aaa"
-                  strokeWidth="1"
-                />
-
-                {/* Claw tips */}
-                <circle cx="22" cy="52" r="4" fill="#999" stroke="#bbb" strokeWidth="1" />
-                <circle cx="58" cy="52" r="4" fill="#999" stroke="#bbb" strokeWidth="1" />
-                <circle cx="40" cy="50" r="4" fill="#999" stroke="#bbb" strokeWidth="1" />
-
-                {/* Tech details */}
-                <line x1="35" y1="15" x2="45" y2="15" stroke="#0ff" strokeWidth="2" opacity="0.6" />
-                <circle cx="40" cy="15" r="3" fill="#0ff" opacity="0.8" />
-              </g>
-
-              {/* Glow effect */}
-              <circle cx="40" cy="15" r="18" fill="none" stroke="#0ff" strokeWidth="1" opacity="0.3" className="claw-glow" />
-            </svg>
+          {/* Claw (moves vertically) - positioned at end of cable */}
+          <div
+            ref={clawRef}
+            className="claw"
+            style={{
+              position: 'absolute',
+              top: '20px', // Start below cable attachment
+              left: '50%',
+              transform: 'translateX(-50%)',
+            }}
+          >
+            {/* PNG Claw properly aligned to cable - shifted left for angled perspective */}
+            <img
+              src="/src/assets/claw.png"
+              alt="Claw"
+              className="claw-image"
+              style={{
+                width: '96px',
+                height: '96px',
+                objectFit: 'contain',
+                position: 'relative',
+                top: '-15px', // Adjust to align claw shaft with cable
+                left: '-8px', // Shift left to account for angled perspective
+              }}
+            />
           </div>
         </div>
       </div>

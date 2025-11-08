@@ -85,7 +85,10 @@ export const ResultModal: React.FC<ResultModalProps> = ({
   const [claimResult, setClaimResult] = useState<ClaimResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isHoveringTop, setIsHoveringTop] = useState(false);
+  const [backgroundClicked, setBackgroundClicked] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const hoverZoneRef = useRef<HTMLDivElement>(null);
 
   // Restore focus on close
   useEffect(() => {
@@ -100,6 +103,8 @@ export const ResultModal: React.FC<ResultModalProps> = ({
       setClaimed(false);
       setClaimResult(null);
       setError(null);
+      setIsHoveringTop(false);
+      setBackgroundClicked(false);
     }
   }, [isOpen]);
 
@@ -149,6 +154,19 @@ export const ResultModal: React.FC<ResultModalProps> = ({
     }
   };
 
+  const handleBackgroundClick = () => {
+    // Animate the background click
+    setBackgroundClicked(true);
+
+    // Navigate to product page after animation
+    setTimeout(() => {
+      // Assuming product URLs follow a pattern like /products/{slug}
+      // You can adjust this based on your actual routing
+      const productSlug = prize.id || prize.name.toLowerCase().replace(/\s+/g, '-');
+      window.location.href = `/products/${productSlug}`;
+    }, 300);
+  };
+
   const rarityColors: Record<string, string> = {
     common: '#999',
     rare: '#ff6347',
@@ -172,7 +190,7 @@ export const ResultModal: React.FC<ResultModalProps> = ({
   return (
     <div className={styles.modalOverlay} onClick={onClose} role="presentation">
       <div
-        className={styles.modalContent}
+        className={`${styles.modalContent} ${backgroundClicked ? styles.modalContentClicked : ''}`}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -184,8 +202,61 @@ export const ResultModal: React.FC<ResultModalProps> = ({
           backgroundRepeat: 'no-repeat',
         }}
       >
-        {/* Glass pane overlay for content */}
-        <div className={styles.glassPane}>
+        {/* Invisible hover zone at the top for triggering background reveal */}
+        <div
+          ref={hoverZoneRef}
+          onMouseEnter={() => setIsHoveringTop(true)}
+          onMouseLeave={() => setIsHoveringTop(false)}
+          onClick={isHoveringTop ? handleBackgroundClick : undefined}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '150px', // Fixed height hover zone at top
+            zIndex: 1000,
+            cursor: isHoveringTop ? 'pointer' : 'default',
+          }}
+        >
+          {/* Show hint when hovering */}
+          {isHoveringTop && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: 20,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                padding: '8px 16px',
+                background: 'rgba(0, 0, 0, 0.8)',
+                borderRadius: '20px',
+                color: 'white',
+                fontSize: '0.9rem',
+                fontWeight: '500',
+                animation: 'fadeIn 0.3s ease',
+                pointerEvents: 'none',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Click to view product →
+            </div>
+          )}
+        </div>
+
+        {/* Glass pane overlay for content - covers entire modal */}
+        <div
+          className={styles.glassPane}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            borderRadius: '1rem',
+            opacity: isHoveringTop ? 0.1 : 1,
+            transition: 'opacity 0.5s ease-in-out',
+            pointerEvents: isHoveringTop ? 'none' : 'auto',
+          }}
+        >
           {/* You Won header */}
           <div className={styles.winHeader}>
             <h2 className={styles.modalTitle} id="modal-title">

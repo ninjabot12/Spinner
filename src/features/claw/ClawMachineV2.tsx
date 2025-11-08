@@ -7,7 +7,10 @@
 import React, { useRef, useState, useCallback, useMemo } from 'react';
 import MultiRowSlider, { MultiRowSliderHandle, SliderItem, VisibleCard } from '../../components/MultiRowSlider';
 import ClawAnimation, { ClawAnimationHandle } from '../../components/ClawAnimation';
+import { PrizeDisplaySlot } from '../../components/PrizeDisplaySlot';
+import { PhantomCard } from '../../components/PhantomCard';
 import { ResultModal } from './ResultModal';
+import { Prize } from './types';
 import * as mockApi from './mockApi';
 import prizes from './prizes.fixture.json';
 import styles from './styles.module.css';
@@ -23,10 +26,29 @@ interface ClawMachineV2Props {
 export const ClawMachineV2: React.FC<ClawMachineV2Props> = ({ showDevControls = false }) => {
   const sliderRef = useRef<MultiRowSliderHandle>(null);
   const clawRef = useRef<ClawAnimationHandle>(null);
+  const phantomCardRef = useRef<HTMLDivElement>(null);
   const [isSpinning, setIsSpinning] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
   const [playResult, setPlayResult] = useState<any>(null);
   const [showModal, setShowModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const spinStartTimeRef = useRef<number>(0);
+  const apiResultRef = useRef<any>(null);
+
+  // Display slot state
+  const [displaySlotPrize, setDisplaySlotPrize] = useState<Prize | null>(null);
+
+  // Phantom card state
+  const [phantomCard, setPhantomCard] = useState<{
+    prize: Prize;
+    position: { x: number; y: number };
+    size: number;
+    visible: boolean;
+  } | null>(null);
+
+  // Container dimensions (matching the render)
+  const containerWidth = 1200;
+  const containerHeight = 600;
 
   // Convert prizes fixture to slider items
   const sliderItems: SliderItem[] = useMemo(
@@ -88,79 +110,164 @@ export const ClawMachineV2: React.FC<ClawMachineV2Props> = ({ showDevControls = 
   }
 
   /**
-   * Handle GO! button click - initiate spin
+   * Handle GO! button click - initiate continuous spin
    */
   const handleGO = useCallback(async () => {
-    if (isSpinning) return;
+    if (isSpinning) {
+      // Button clicked while spinning - initiate stop sequence
+      if (!isStopping) {
+        setIsStopping(true);
+        console.log('🛑 Stopping spin...');
 
-    setIsSpinning(true);
-    setError(null);
+        // Calculate minimum spin time (ensure at least 1 second of spinning)
+        const spinTime = Date.now() - spinStartTimeRef.current;
+        const minSpinTime = 1000;
 
-    try {
-      // Call mock API to get the prize (for backend validation)
-      const result = await mockApi.play();
-      console.log('🎲 Prize result from API:', result);
+        if (spinTime < minSpinTime) {
+          // Wait a bit more before stopping
+          await new Promise(resolve => setTimeout(resolve, minSpinTime - spinTime));
+        }
 
-      // Spin all 3 rows for 4 seconds
-      const spinDuration = 4000;
-      await sliderRef.current?.spinToResult(result.prize.id, spinDuration);
+        // Stop with deceleration animation
+        await sliderRef.current?.stopSpinWithDeceleration(1500);
 
-      console.log('✅ Spin complete, rows frozen');
+        console.log('✅ Spin stopped, rows frozen');
 
-      // Get all visible cards from all rows (3x5 grid = 15 cards)
-      const visibleCards = sliderRef.current?.getVisibleCards() || [];
-      console.log('👀 Visible cards after freeze (3x5 grid):', visibleCards);
+        // Wait a bit for carousel to settle
+        await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Select winning card from visible cards (respecting drop rates)
-      const winningCard = selectWinningCard(visibleCards);
-      console.log('🎯 Selected winning card:', winningCard);
-      console.log('📍 Grid position for claw:', winningCard.gridPosition);
+        // Get all visible cards from all rows (3x5 grid = 15 cards)
+        const visibleCards = sliderRef.current?.getVisibleCards() || [];
 
-      // Animate claw to winning position
-      await clawRef.current?.moveToPosition(winningCard.gridPosition, 2.5);
+        // Select winning card from visible cards (respecting drop rates)
+        const winningCard = selectWinningCard(visibleCards);
 
-      // Highlight the winning card with golden outline using grid coordinates
-      sliderRef.current?.highlightCard(winningCard.rowIndex, winningCard.colIndex);
+        // Find the actual prize data
+        const actualPrize = prizes.find((p) => p.id === winningCard.prizeId);
 
-      // Wait a moment for highlight effect
-      await new Promise(resolve => setTimeout(resolve, 800));
+        if (!actualPrize) {
+          throw new Error('Could not find winning prize');
+        }
 
-      // Find the actual prize data
-      const actualPrize = prizes.find((p) => p.id === winningCard.prizeId);
+        // Calculate card size from container
+        const rowHeight = (containerHeight - 2 * 12) / 3; // 3 rows with 12px gaps
+        const cardSize = rowHeight * 0.85;
 
-      if (!actualPrize) {
-        throw new Error('Could not find winning prize');
+        // Setup phantom card (initially hidden, positioned at winning card's grid position)
+        setPhantomCard({
+          prize: actualPrize as Prize,
+          position: winningCard.gridPosition,
+          size: cardSize,
+          visible: false,
+        });
+
+        // Wait for phantom card to be rendered in DOM before claw can access it
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        // Calculate display slot position (bottom left area, below carousel)
+        // Display slot is 180px wide, inner box is 140px, plus margins
+        const displaySlotPosition = {
+          x: 90 + 30, // Display slot center: 90px (half of 180px width) + 30px left margin
+          y: containerHeight + 110, // Below carousel + margin to reach control panel area center
+        };
+
+        // SUSPENSE: Start claw movement WITHOUT highlighting yet
+        console.log('🤖 Starting claw animation...');
+
+        // Start the claw animation in parallel with suspense timing
+        const clawPromise = clawRef.current?.pickupAndDeliver(
+          winningCard.gridPosition,
+          displaySlotPosition,
+          phantomCardRef,
+          cardSize
+        );
+
+        // Build suspense: Wait before revealing which card will be grabbed
+        // The claw will be moving horizontally during this time
+        await new Promise(resolve => setTimeout(resolve, 900));
+
+        // NOW highlight the winning card as claw is approaching (creates "aha!" moment)
+        sliderRef.current?.highlightCard(winningCard.rowIndex, winningCard.colIndex);
+
+        // Hide the winning card from carousel when claw grabs it
+        // Adjusted timing: 900ms delay + 300ms more horizontal + 800ms descent = 2000ms total
+        setTimeout(() => {
+          sliderRef.current?.hideCard(winningCard.rowIndex, winningCard.colIndex);
+          sliderRef.current?.clearHighlight();
+        }, 1100);
+
+        // Trigger display slot prize when claw arrives at delivery position
+        // Calculate timing: horizontal(1.2) + descend(0.8) + grab(0.15) + scale(0.6) + lift(0.6) + carry(1.5) = 4.85s
+        setTimeout(() => {
+          console.log('🎯 Triggering display slot prize update');
+          setPhantomCard(null); // Hide phantom card
+          setDisplaySlotPrize(actualPrize as Prize); // Show in display slot immediately
+        }, 4850); // Right when claw arrives at delivery position
+
+        // Wait for the claw animation to complete
+        await clawPromise;
+
+        console.log('🚚 Card delivered to display slot');
+
+        // Wait for bouncy animation to complete (reduced from 1000ms to 800ms)
+        await new Promise((resolve) => setTimeout(resolve, 800));
+
+        // Create result with the winning prize using the saved API result
+        const actualResult = {
+          ...apiResultRef.current,
+          prize: actualPrize,
+        };
+
+        // Show the modal
+        setPlayResult(actualResult);
+        setShowModal(true);
+        console.log('🎉 Modal opened with winning prize');
+
+        // Reset stopping state
+        setIsStopping(false);
+        setIsSpinning(false);
       }
+    } else {
+      // Start a new spin
+      setIsSpinning(true);
+      setError(null);
 
-      console.log(`🎁 Winning prize: ${actualPrize.name} (${actualPrize.id})`);
+      try {
+        // Reset state from previous spin
+        console.log('🔄 Resetting carousel state...');
+        sliderRef.current?.clearHighlight();
+        sliderRef.current?.resetHiddenCards(); // Show all cards again
 
-      // Create result with the winning prize
-      const actualResult = {
-        ...result,
-        prize: actualPrize,
-      };
+        // Clear phantom card
+        setPhantomCard(null);
 
-      // Show the modal
-      setPlayResult(actualResult);
-      setShowModal(true);
-      console.log('🎉 Modal opened with winning prize');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to play');
-    } finally {
-      setIsSpinning(false);
+        // Clear display slot prize (triggers exit animation)
+        setDisplaySlotPrize(null);
+
+        // Call mock API to get the prize (for backend validation)
+        const result = await mockApi.play();
+        console.log('🎲 Prize result from API:', result);
+        apiResultRef.current = result; // Save for later use
+
+        // Record spin start time
+        spinStartTimeRef.current = Date.now();
+
+        // Start continuous spin
+        sliderRef.current?.startContinuousSpin();
+        console.log('🎰 Spinning started - click button again to stop');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to play');
+        setIsSpinning(false);
+      }
     }
-  }, [isSpinning]);
+  }, [isSpinning, isStopping, containerHeight]);
 
   /**
    * Handle claim action in modal
    */
   const handleClaim = useCallback(() => {
     // Modal handles the claim logic internally
-    setTimeout(() => {
-      setShowModal(false);
-      setPlayResult(null);
-      sliderRef.current?.clearHighlight();
-    }, 1500);
+    // Don't auto-close - let user close manually via X button or Esc
   }, []);
 
   /**
@@ -173,6 +280,7 @@ export const ClawMachineV2: React.FC<ClawMachineV2Props> = ({ showDevControls = 
     clawRef.current?.reset();
     setShowModal(false);
     setPlayResult(null);
+    // Note: We keep the prize in the display slot until next play
   }, []);
 
   return (
@@ -189,6 +297,7 @@ export const ClawMachineV2: React.FC<ClawMachineV2Props> = ({ showDevControls = 
           boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)',
         }}
       >
+
         <div
           style={{
             position: 'relative',
@@ -205,52 +314,71 @@ export const ClawMachineV2: React.FC<ClawMachineV2Props> = ({ showDevControls = 
             onSpinComplete={() => console.log('Spin animation complete')}
           />
 
+          {/* Phantom Card - animated clone for pickup/delivery */}
+          {phantomCard && (
+            <PhantomCard
+              ref={phantomCardRef}
+              prize={phantomCard.prize}
+              initialPosition={phantomCard.position}
+              size={phantomCard.size}
+              visible={phantomCard.visible}
+            />
+          )}
+
           {/* Claw Animation Overlay */}
           <ClawAnimation
             ref={clawRef}
-            containerWidth={1200}
-            containerHeight={600}
+            containerWidth={containerWidth}
+            containerHeight={containerHeight}
             railTop={10}
           />
         </div>
       </div>
 
-      {/* Control Panel */}
-      <div className={styles.controlPanel}>
-        <button
-          className={`${styles.button} ${styles.buttonPrimary}`}
-          onClick={handleGO}
-          disabled={isSpinning}
-          style={{
-            fontSize: '2rem',
-            padding: '1.5rem 4rem',
-            minWidth: '200px',
-          }}
-        >
-          {isSpinning ? 'SPINNING...' : 'GO!'}
-        </button>
+      {/* Control Panel - with display slot on left, GO button center, dev controls on right */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '2rem', position: 'relative' }}>
+        {/* Prize Display Slot - bottom left */}
+        <div style={{ flex: '0 0 auto' }}>
+          <PrizeDisplaySlot prize={displaySlotPrize} />
+        </div>
 
-        {error && (
-          <div className={styles.errorMessage}>
-            {error}
+        {/* GO Button - center */}
+        <div className={styles.controlPanel} style={{ flex: '1 1 auto', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <button
+            className={`${styles.button} ${styles.buttonPrimary}`}
+            onClick={handleGO}
+            disabled={isStopping}
+            style={{
+              fontSize: '2rem',
+              padding: '1.5rem 4rem',
+              minWidth: '200px',
+            }}
+          >
+            {isStopping ? 'STOPPING...' : isSpinning ? 'STOP' : 'GO!'}
+          </button>
+
+          {error && (
+            <div className={styles.errorMessage}>
+              {error}
+            </div>
+          )}
+        </div>
+
+        {/* Dev Controls - right side */}
+        {showDevControls && (
+          <div className={styles.devControls} style={{ flex: '0 0 auto' }}>
+            <h3>Dev Controls</h3>
+            <button onClick={() => sliderRef.current?.freeze()}>Freeze</button>
+            <button onClick={() => sliderRef.current?.unfreeze()}>Unfreeze</button>
+            <button onClick={() => {
+              const visible = sliderRef.current?.getVisibleCards();
+              console.log('Visible cards:', visible);
+            }}>
+              Log Visible Cards
+            </button>
           </div>
         )}
       </div>
-
-      {/* Dev Controls */}
-      {showDevControls && (
-        <div className={styles.devControls}>
-          <h3>Dev Controls</h3>
-          <button onClick={() => sliderRef.current?.freeze()}>Freeze</button>
-          <button onClick={() => sliderRef.current?.unfreeze()}>Unfreeze</button>
-          <button onClick={() => {
-            const visible = sliderRef.current?.getVisibleCards();
-            console.log('Visible cards:', visible);
-          }}>
-            Log Visible Cards
-          </button>
-        </div>
-      )}
 
       {/* Result Modal */}
       {playResult && (

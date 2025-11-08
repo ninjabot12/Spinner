@@ -327,6 +327,23 @@
   width: 100%;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
   animation: slideUp var(--timing-normal) ease;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Clicked animation for modal content */
+.modalContentClicked {
+  transform: scale(0.98);
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.7);
+}
+
+/* Hover zone for background reveal */
+.hoverZone {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  transition: all 0.3s ease;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -340,6 +357,15 @@
   }
   to {
     transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
     opacity: 1;
   }
 }
@@ -377,15 +403,16 @@
 
 /* Glass Pane Effect */
 .glassPane {
-  background: rgba(30, 30, 30, 0.35);
+  background: rgba(30, 30, 30, 0.85);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   padding: 2rem;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-  border-radius: 0 0 1rem 1rem;
+  border-radius: 1rem;
   flex-shrink: 0;
+  z-index: 2;
 }
 
 /* Win Header */

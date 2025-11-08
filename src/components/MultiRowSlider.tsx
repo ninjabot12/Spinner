@@ -29,10 +29,13 @@ export interface VisibleCard {
   cardIndex: number; // Index in items array
   prizeId: string;
   gridPosition: GridPosition;
+  domElement?: HTMLDivElement; // Reference to actual DOM element
 }
 
 export interface MultiRowSliderHandle {
   spinToResult(prizeId: string, duration: number): Promise<void>;
+  startContinuousSpin(): void;
+  stopSpinWithDeceleration(duration?: number): Promise<void>;
   snapToGrid(): void;
   freeze(): void;
   unfreeze(): void;
@@ -40,6 +43,9 @@ export interface MultiRowSliderHandle {
   highlightCard(rowIndex: number, colIndex: number): void;
   clearHighlight(): void;
   getGridPosition(row: number, col: number): GridPosition;
+  hideCard(rowIndex: number, colIndex: number): void;
+  showCard(rowIndex: number, colIndex: number): void;
+  resetHiddenCards(): void;
 }
 
 interface Props {
@@ -53,6 +59,7 @@ const MultiRowSlider = forwardRef<MultiRowSliderHandle, Props>(
     const containerRef = useRef<HTMLDivElement>(null);
     const rowRefs = useRef<HTMLDivElement[]>([]);
     const [highlightedCard, setHighlightedCard] = useState<{ row: number; col: number } | null>(null);
+    const [hiddenCard, setHiddenCard] = useState<{ row: number; col: number } | null>(null);
     const [isSpinning, setIsSpinning] = useState(false);
     const animationFrameRef = useRef<number>();
 
@@ -77,7 +84,7 @@ const MultiRowSlider = forwardRef<MultiRowSliderHandle, Props>(
     const cardSizeRef = useRef(200);
     const gapSize = 16; // Gap between cards
 
-    // Helper: Get pixel position for a grid cell
+    // Helper: Calculate exact grid position after snap
     const getGridPosition = (row: number, col: number): GridPosition => {
       if (!containerRef.current) {
         return { row, col, x: 0, y: 0 };
@@ -85,20 +92,25 @@ const MultiRowSlider = forwardRef<MultiRowSliderHandle, Props>(
 
       const containerWidth = containerRef.current.clientWidth;
       const containerHeight = containerRef.current.clientHeight;
-      const cardWidth = cardSizeRef.current + gapSize;
-      const targetVisibleCards = 5;
+      const cardSize = cardSizeRef.current;
+      const cardWidth = cardSize + gapSize;
 
-      // Calculate grid layout
+      // Calculate row layout
+      const rowHeight = (containerHeight - (rowCount - 1) * 12) / rowCount;
+      const totalRowsHeight = rowHeight * rowCount + 12 * (rowCount - 1);
+      const topMargin = (containerHeight - totalRowsHeight) / 2;
+
+      // Calculate column layout for exactly 5 visible cards
+      const targetVisibleCards = 5;
       const totalCardsWidth = targetVisibleCards * cardWidth - gapSize;
       const leftMargin = (containerWidth - totalCardsWidth) / 2;
 
-      // Calculate row height
-      const rowHeight = (containerHeight - (rowCount - 1) * 12) / rowCount;
-      const topMargin = (containerHeight - (rowHeight * rowCount + 12 * (rowCount - 1))) / 2;
-
-      // Calculate center position of the card
-      const x = leftMargin + col * cardWidth + cardSizeRef.current / 2;
+      // After snap, cards should be perfectly aligned to grid
+      // Column 0 starts at leftMargin, each subsequent column is cardWidth apart
+      const x = leftMargin + col * cardWidth + cardSize / 2;
       const y = topMargin + row * (rowHeight + 12) + rowHeight / 2;
+
+      // Removed console log for performance
 
       return { row, col, x, y };
     };
@@ -109,21 +121,12 @@ const MultiRowSlider = forwardRef<MultiRowSliderHandle, Props>(
 
       const containerWidth = containerRef.current.clientWidth;
       const cardWidth = cardSizeRef.current + gapSize;
-      const targetVisibleCards = 5;
       const totalWidth = cardWidth * items.length;
 
-      rowStates.current.forEach((state) => {
-        // Calculate the left margin needed to center exactly 5 cards
-        const totalCardsWidth = targetVisibleCards * cardWidth - gapSize;
-        const leftMargin = (containerWidth - totalCardsWidth) / 2;
-
-        // Find which card should be at the leftmost position
-        // We want: position + leftMargin = N * cardWidth (where N is integer)
-        const currentOffset = state.position + leftMargin;
-        const nearestCardBoundary = Math.round(currentOffset / cardWidth);
-
-        // Calculate the exact position needed
-        const targetPosition = nearestCardBoundary * cardWidth - leftMargin;
+      rowStates.current.forEach((state, rowIndex) => {
+        // Round position to nearest card boundary
+        const nearestCard = Math.round(state.position / cardWidth);
+        const targetPosition = nearestCard * cardWidth;
 
         // Normalize to valid range [0, totalWidth)
         let normalizedPosition = targetPosition % totalWidth;
@@ -132,7 +135,15 @@ const MultiRowSlider = forwardRef<MultiRowSliderHandle, Props>(
         }
 
         state.position = normalizedPosition;
+
+        // Apply the transform immediately
+        const rowEl = rowRefs.current[rowIndex];
+        if (rowEl) {
+          rowEl.style.transform = `translateX(${-normalizedPosition}px)`;
+        }
       });
+
+      // Position snapped
     };
 
     useEffect(() => {
@@ -242,6 +253,66 @@ const MultiRowSlider = forwardRef<MultiRowSliderHandle, Props>(
         });
       },
 
+      startContinuousSpin: () => {
+        setIsSpinning(true);
+        setHighlightedCard(null);
+
+        // Alternating rows spin in opposite directions
+        rowStates.current.forEach((state, index) => {
+          state.direction = index % 2 === 0 ? 1 : -1; // Even rows right, odd rows left
+          state.velocity = (15 + Math.random() * 10) * 0.85; // Fast spin speed
+          state.frozen = false;
+        });
+      },
+
+      stopSpinWithDeceleration: async (duration: number = 2000) => {
+        // Start deceleration
+        const decelerationStartTime = Date.now();
+        const initialVelocities = rowStates.current.map(state => state.velocity);
+
+        return new Promise<void>((resolve) => {
+          const decelerate = () => {
+            const elapsed = Date.now() - decelerationStartTime;
+            const progress = Math.min(elapsed / duration, 1);
+
+            // Easing function for smooth deceleration
+            const easeOut = 1 - Math.pow(1 - progress, 3);
+
+            rowStates.current.forEach((state, index) => {
+              if (!state.frozen) {
+                // Gradually reduce velocity
+                state.velocity = initialVelocities[index] * (1 - easeOut);
+
+                // When nearly stopped, just freeze without snapping
+                if (progress >= 0.98 || state.velocity < 0.1) {
+                  state.frozen = true;
+                  state.velocity = 0;
+                }
+              }
+            });
+
+            // Check if all rows are frozen
+            const allFrozen = rowStates.current.every(state => state.frozen);
+
+            if (allFrozen || progress >= 1) {
+              // Ensure all rows are frozen
+              rowStates.current.forEach(state => {
+                state.frozen = true;
+                state.velocity = 0;
+              });
+
+              setIsSpinning(false);
+              if (onSpinComplete) onSpinComplete();
+              resolve();
+            } else {
+              requestAnimationFrame(decelerate);
+            }
+          };
+
+          requestAnimationFrame(decelerate);
+        });
+      },
+
       snapToGrid: () => {
         snapPositionsToGrid();
       },
@@ -269,36 +340,61 @@ const MultiRowSlider = forwardRef<MultiRowSliderHandle, Props>(
         const targetVisibleCards = 5;
         const visibleCards: VisibleCard[] = [];
 
+        // Calculate the left margin (where cards should be centered)
+        const totalCardsWidth = targetVisibleCards * cardWidth - gapSize;
+        const leftMargin = (containerWidth - totalCardsWidth) / 2;
+
+        // For each row, determine which cards are visible
         rowStates.current.forEach((state, rowIndex) => {
           const position = state.position;
 
-          // Calculate the left margin (where the first card starts)
-          const totalCardsWidth = targetVisibleCards * cardWidth - gapSize;
-          const leftMargin = (containerWidth - totalCardsWidth) / 2;
+          // We render triple items, so total rendered width is 3x items length
+          const totalRenderedCards = items.length * 3;
 
-          // Calculate which card is at the left margin - MUST be exact after snap
-          const startIndex = Math.round((position + leftMargin) / cardWidth);
+          // Find which cards are in the visible viewport
+          // The visible area starts at leftMargin and extends for totalCardsWidth
+          const visibleStartX = leftMargin;
+          const visibleEndX = leftMargin + totalCardsWidth;
 
-          // Return exactly 5 centered cards with their grid positions
-          for (let colIndex = 0; colIndex < targetVisibleCards; colIndex++) {
-            // Calculate the card index in the items array
-            let cardIndex = (startIndex + colIndex) % items.length;
-            if (cardIndex < 0) {
-              cardIndex = items.length + cardIndex;
-            }
+          const rowCards: VisibleCard[] = [];
 
-            // Double-check cardIndex is valid before accessing
-            if (cardIndex >= 0 && cardIndex < items.length && items[cardIndex]) {
-              visibleCards.push({
-                rowIndex,
-                colIndex,
-                cardIndex,
-                prizeId: items[cardIndex].prizeId,
-                gridPosition: getGridPosition(rowIndex, colIndex),
-              });
+          // Check each rendered card position
+          for (let i = 0; i < totalRenderedCards; i++) {
+            // Calculate this card's position on screen
+            const cardX = i * cardWidth - position;
+            const cardCenterX = cardX + cardWidth / 2;
+
+            // Is this card's center in the visible area?
+            if (cardCenterX >= visibleStartX && cardCenterX <= visibleEndX) {
+              // Map back to original item index
+              const originalIndex = i % items.length;
+
+              // Calculate which column this card is in (0-4)
+              const colIndex = Math.round((cardCenterX - visibleStartX) / cardWidth - 0.5);
+
+              if (colIndex >= 0 && colIndex < targetVisibleCards) {
+                const gridPos = getGridPosition(rowIndex, colIndex);
+
+                // Avoid duplicates (since we render triple)
+                if (!rowCards.some(c => c.colIndex === colIndex)) {
+                  rowCards.push({
+                    rowIndex,
+                    colIndex,
+                    cardIndex: originalIndex,
+                    prizeId: items[originalIndex].prizeId,
+                    gridPosition: gridPos,
+                  });
+                }
+              }
             }
           }
+
+          // Sort by column and add to results
+          rowCards.sort((a, b) => a.colIndex - b.colIndex);
+          visibleCards.push(...rowCards);
         });
+
+        // Return visible cards without logging
 
         return visibleCards;
       },
@@ -315,6 +411,24 @@ const MultiRowSlider = forwardRef<MultiRowSliderHandle, Props>(
 
       clearHighlight: () => {
         setHighlightedCard(null);
+      },
+
+      hideCard: (rowIndex: number, colIndex: number) => {
+        setHiddenCard({ row: rowIndex, col: colIndex });
+      },
+
+      showCard: (rowIndex: number, colIndex: number) => {
+        // Only clear if this specific card is hidden
+        setHiddenCard((prev) => {
+          if (prev?.row === rowIndex && prev?.col === colIndex) {
+            return null;
+          }
+          return prev;
+        });
+      },
+
+      resetHiddenCards: () => {
+        setHiddenCard(null);
       },
     }));
 
@@ -353,7 +467,8 @@ const MultiRowSlider = forwardRef<MultiRowSliderHandle, Props>(
 
               // Calculate which column this card is in (if any)
               let isHighlighted = false;
-              if (highlightedCard?.row === rowIndex) {
+              let isHidden = false;
+              if (highlightedCard?.row === rowIndex || hiddenCard?.row === rowIndex) {
                 const state = rowStates.current[rowIndex];
                 if (state && containerRef.current) {
                   const cardWidth = cardSizeRef.current + gapSize;
@@ -366,12 +481,25 @@ const MultiRowSlider = forwardRef<MultiRowSliderHandle, Props>(
                   const startIndex = Math.round((state.position + leftMargin) / cardWidth);
 
                   // Check if this itemIndex corresponds to the highlighted column
-                  const colIndex = highlightedCard.col;
-                  const expectedCardIndex = startIndex + colIndex;
+                  if (highlightedCard?.row === rowIndex) {
+                    const colIndex = highlightedCard.col;
+                    const expectedCardIndex = startIndex + colIndex;
 
-                  // This physical card is highlighted if it's at the right position
-                  if (itemIndex === expectedCardIndex % (items.length * 3)) {
-                    isHighlighted = true;
+                    // This physical card is highlighted if it's at the right position
+                    if (itemIndex === expectedCardIndex % (items.length * 3)) {
+                      isHighlighted = true;
+                    }
+                  }
+
+                  // Check if this card should be hidden
+                  if (hiddenCard?.row === rowIndex) {
+                    const colIndex = hiddenCard.col;
+                    const expectedCardIndex = startIndex + colIndex;
+
+                    // This physical card is hidden if it's at the right position
+                    if (itemIndex === expectedCardIndex % (items.length * 3)) {
+                      isHidden = true;
+                    }
                   }
                 }
               }
@@ -379,7 +507,7 @@ const MultiRowSlider = forwardRef<MultiRowSliderHandle, Props>(
               return (
                 <div
                   key={`${rowIndex}-${itemIndex}`}
-                  className={`slider-card ${isHighlighted ? 'highlighted' : ''}`}
+                  className={`slider-card ${isHighlighted ? 'highlighted' : ''} ${isHidden ? 'hidden' : ''}`}
                   style={{
                     width: `${cardWidth}px`,
                     height: `${cardWidth}px`,
